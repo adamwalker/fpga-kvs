@@ -6,3 +6,8 @@ Implemented in [Clash](https://clash-lang.org/).
 
 Runs on the [Arty board](https://store.digilentinc.com/arty-a7-artix-7-fpga-development-board-for-makers-and-hobbyists/).
 
+## Build
+
+Make sure Vivado is in your path
+
+$ ./build.sh

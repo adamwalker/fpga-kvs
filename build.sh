@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 pushd clash
 stack exec clash -- --verilog kvs.hs
