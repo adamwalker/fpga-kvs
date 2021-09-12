@@ -17,3 +17,9 @@ $ ./build.sh
 Program the image onto the FPGA using the Vivado hardware manager
 
 $ sudo ./setup\_net.sh <network interface connected to the fpga>
+
+## Test
+
+$ cd test
+$ make
+$ ./test
