@@ -4,12 +4,13 @@ import qualified Prelude
 
 import Data.Maybe
 
-import Clash.Container.FIFO
-import Clash.Network.Types
-import Clash.Stream.Stream
-import Clash.ErrorControl.CRC
 import Clash.Container.CuckooPipeline
 import Clash.Container.FIFO
+import Clash.ErrorControl.CRC
+import Clash.Misc
+import Clash.Network.Types
+import Clash.Stream.Packet
+import Clash.Stream.Resize
 
 networkHeaders :: Vec 84 (BitVector 4)
 networkHeaders = concatMap func $ bitCoerce (ethernetHeader, ipHeader, udpHeader)
@@ -54,7 +55,7 @@ hashtable
         Signal dom (Maybe (BitVector 64)),
         Signal dom Bool
         )
-hashtable lu cmd = cuckooPipelineInsert hashFunctions lu cmd
+hashtable lu cmd = cuckooPipelineInsert (SNat @ 0) hashFunctions lu cmd
     where
     hashFunctions 
         =  (\x -> unpack (crc0 x))
@@ -100,7 +101,7 @@ topEntity'
 topEntity' vld eof dat ready = unbundle headeredStream
     where
     noHeaderStream     = dropStream (SNat @ 84) $ bundle (vld, eof, dat)
-    (wideVld, wideDat) = unbundle $ widenStream noHeaderStream
+    (wideVld, _, wideDat) = unbundle $ fst $ widenStream noHeaderStream (pure True)
 
     (bufferedDat, bufferedFull, _, _) = blockRamFIFO (SNat @ 10) (not <$> busy) wideDat wideVld
 
