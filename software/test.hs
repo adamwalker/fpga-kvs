@@ -9,6 +9,7 @@ import Network.Socket (Socket, SockAddr)
 import qualified Network.Socket as Socket
 import Network.Socket.ByteString (sendAllTo, recv)
 import Data.Serialize
+import System.IO (hFlush, stdout)
 
 --Insert/delete/lookup command to send to FPGA
 data Command = Command {
@@ -17,6 +18,7 @@ data Command = Command {
     value   :: Word64
 } deriving (Show)
 
+--Encode the command
 putCommand :: Putter Command
 putCommand Command{..}
     =  putWord32be command
@@ -29,6 +31,7 @@ data LookupResult = LookupResult {
     result  :: Word64
 } deriving (Show)
 
+--Decode the result
 getResult :: Get LookupResult
 getResult
     =   LookupResult
@@ -53,10 +56,10 @@ lookup socket fpgaAddress key = do
     res <- recv socket 16
     return $ runGet getResult res
 
---How many items to insert
+--How many items to insert. Based on the number of RAMs available on the FPGA
 maxIdx = 7500
 
---Derive keys and values from index
+--Derive keys and values from indices to get a "random" distribution of keys
 keyFunc1 :: Int -> Word64
 keyFunc1 x = fromIntegral $ x ^ 2
 
@@ -70,21 +73,30 @@ valueFunc x = fromIntegral $ x ^ 5
 fillAndEmpty :: Socket -> SockAddr -> IO ()
 fillAndEmpty socket fpgaAddress = do
 
+    putStr "Testing filling the hashtable up, reading everything back, deleting everything, then making sure its empty... "
+    hFlush stdout
+
+    --Insert the values
     forM_ [0..maxIdx] $ \idx -> insert socket fpgaAddress (keyFunc1 idx) (valueFunc idx)
 
+    --Readback the values
     forM_ [0..maxIdx] $ \idx -> do
         res <- lookup socket fpgaAddress (keyFunc1 idx)
         case res of
-            Left err -> putStrLn $ "Parsing error" ++ err
-            Right res -> when ((present res /= 1) || (result res /= valueFunc idx)) $ putStrLn "Error after insertion"
+            Left err 
+                -> putStrLn $ "Parsing error after insert" ++ err
+            Right res -> do
+                when (present res /= 1) $ putStrLn "Error: inserted item is not present"
+                when (result res /= valueFunc idx) $ putStrLn $ "Error: inserted item has the wrong value. Expected: " ++ show (valueFunc idx) ++ ". Got: " ++ show (result res)
 
+    --Delete the values
     forM_ [0..maxIdx] $ \idx -> delete socket fpgaAddress (keyFunc1 idx)
 
     forM_ [0..maxIdx] $ \idx -> do
         res <- lookup socket fpgaAddress (keyFunc1 idx)
         case res of
-            Left err -> putStrLn $ "Parsing error" ++ err
-            Right res -> when (present res /= 0) $ putStrLn "Error after deletion"
+            Left err -> putStrLn $ "Parsing error after delete" ++ err
+            Right res -> when (present res /= 0) $ putStrLn "Error: item is still present after deletion"
 
     putStrLn "Success!"
 
@@ -92,24 +104,40 @@ fillAndEmpty socket fpgaAddress = do
 alternateInsertRead :: Socket -> SockAddr -> IO ()
 alternateInsertRead socket fpgaAddress = do
 
+    putStr "Testing filling the hashtable up while reading back each inserted value... "
+    hFlush stdout
+
+    --Alternate inserting and reading back
     forM_ [0..maxIdx] $ \idx -> do
 
+        --Insert a value
         insert socket fpgaAddress (keyFunc2 idx) (valueFunc idx + 1)
+        --Overwrite it 
         insert socket fpgaAddress (keyFunc2 idx) (valueFunc idx)
 
+        --Lookup the value
         res <- lookup socket fpgaAddress (keyFunc2 idx)
+        --Check the correct value is returned
         case res of
-            Left err -> putStrLn $ "Parsing error" ++ err
-            Right res -> when ((present res /= 1) || (result res /= valueFunc idx)) $ putStrLn "Error after insertion"
+            Left err 
+                -> putStrLn $ "Parsing error after insert" ++ err
+            Right res -> do
+                when (present res /= 1) $ putStrLn "Error: inserted item is not present"
+                when (result res /= valueFunc idx) $ putStrLn $ "Error: inserted item has the wrong value. Expected: " ++ show (valueFunc idx) ++ ". Got: " ++ show (result res)
 
+    --Alternate deleting and reading back
     forM_ [0..maxIdx] $ \idx -> do
 
+        --Delete it
         delete socket fpgaAddress (keyFunc2 idx)
 
+        --Check it's not there
         res <- lookup socket fpgaAddress (keyFunc2 idx)
         case res of
-            Left err -> putStrLn $ "Parsing error" ++ err
-            Right res -> when (present res /= 0) $ putStrLn "Error after insertion"
+            Left err 
+                -> putStrLn $ "Parsing error after delete" ++ err
+            Right res 
+                -> when (present res /= 0) $ putStrLn "Error: item is still present after deletion"
 
     putStrLn "Success!"
 
@@ -123,6 +151,7 @@ main = do
     Socket.bind socket hostAddress
 
     --Repeat both tests forever in a loop
+    putStrLn "Looping tests forever..."
     forever $ do
         alternateInsertRead socket fpgaAddress
         fillAndEmpty socket fpgaAddress
