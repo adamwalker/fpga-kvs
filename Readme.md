@@ -11,3 +11,9 @@ Runs on the [Arty board](https://store.digilentinc.com/arty-a7-artix-7-fpga-deve
 Make sure Vivado is in your path
 
 $ ./build.sh
+
+## Setup
+
+Program the image onto the FPGA using the Vivado hardware manager
+
+$ sudo ./setup\_net.sh <network interface connected to the fpga>

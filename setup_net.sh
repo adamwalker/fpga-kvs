@@ -1,4 +1,6 @@
 #!/bin/sh 
+set -e
+
 # Enable the interface connected to the Arty
 ip link set dev $1 up
 # Give that interface an IP address
