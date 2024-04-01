@@ -8,6 +8,8 @@ Implemented in [Clash](https://clash-lang.org/).
 
 Runs on the [Arty board](https://store.digilentinc.com/arty-a7-artix-7-fpga-development-board-for-makers-and-hobbyists/).
 
+An improved version of this hashtable can be found [here](https://github.com/adamwalker/fpga-hashmap).
+
 ## Build
 
 Make sure Vivado is in your path, then
